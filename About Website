@@ -1,0 +1,181 @@
+DomeGuard 🛡️
+
+DomeGuard is a lightweight, responsive website and domain status monitoring microservice. It continuously audits registered domains, stores diagnostic performance logs (like latency and status codes), and provides system administrators with real-time operational telemetry and outage warnings.
+
+This repository features a Vue.js 3 dashboard frontend, a Spring Boot 3 asynchronous scheduling engine, and a PostgreSQL relational database schema.
+
+🏗️ Architecture Overview
+
+The system operates on a clean 3-tier microservice model:
+
+[ Vue.js 3 Web Client ] <--- HTTP REST ---> [ Spring Boot 3 Engine ] <--- JDBC/JPA ---> [ PostgreSQL Database ]
+                                                   |
+                                            (Scheduled Thread Pool)
+                                                   |
+                                                   v
+                                         [ Target Web Servers ] (Pings)
+
+
+Frontend (Vue.js 3 + Tailwind CSS): A high-performance, single-page application monitoring dashboard. Features quick diagnostic controls, real-time logging, and interactive database exploration.
+
+Backend (Spring Boot 3 + Java 17):
+
+Controller Layer: Exposes REST endpoints to manage domains and trigger manual checks.
+
+Scheduled Engine: Employs a fixed-rate Scheduled thread pool executor that wakes up automatically (e.g., every 10 seconds) to audit registered endpoints.
+
+Persistence Layer: Harnesses Spring Data JPA & Hibernate to query/update Postgres targets and insert structured latency records.
+
+Database (PostgreSQL 15+): Stores registered domains and indexes historical latency checks for performance auditing.
+
+✨ Key Features
+
+Real-time Availability Tracking: Auto-resolves HTTP status codes and response latencies using asynchronous multi-threaded checks.
+
+Database Logs Explorer: Full visualization of PostgreSQL relational tables (monitored_domains and latency_logs) directly in the app.
+
+Spring Scheduler Daemon Terminal: Mocked command-line stream displaying Spring engine system events, Hibernate raw inserts, and HTTP clients' successes/timeouts.
+
+On-Demand Diagnoses: Bypass the scheduler to run instantaneous manual force-pings on target endpoints.
+
+Fault Injection Simulation: Simulate downtime or latency spikes to observe database failover response parameters.
+
+🗄️ Database Schema (PostgreSQL)
+
+DomeGuard uses two relational tables linked by foreign keys with active indices on search parameters:
+
+-- 1. Table schema to register websites
+CREATE TABLE monitored_domains (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    url VARCHAR(512) NOT NULL,
+    check_interval INT DEFAULT 10,
+    http_method VARCHAR(10) DEFAULT 'GET',
+    last_status VARCHAR(15) DEFAULT 'UNKNOWN',
+    last_latency BIGINT DEFAULT 0,
+    last_checked TIMESTAMP
+);
+
+-- 2. Performance metrics historical logs table
+CREATE TABLE latency_logs (
+    log_id SERIAL PRIMARY KEY,
+    domain_id INT NOT NULL REFERENCES monitored_domains(id) ON DELETE CASCADE,
+    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    http_status_code INT,
+    latency_ms BIGINT,
+    result_state VARCHAR(10)
+);
+
+-- Index performance checks for reporting metrics
+CREATE INDEX idx_latency_logs_domain ON latency_logs(domain_id);
+CREATE INDEX idx_checked_timestamp ON latency_logs(checked_at);
+
+
+🚀 Getting Started
+
+Follow these steps to set up the backend service and run the application locally.
+
+Prerequisites
+
+Java SDK 17 or higher
+
+Maven 3.8+
+
+PostgreSQL Database running on port 5432
+
+1. Database Setup
+
+Create a new PostgreSQL database and user:
+
+CREATE DATABASE main_analytics;
+-- Connect to the database and execute the schema.sql queries listed above.
+
+
+2. Configure Backend Applications
+
+Locate src/main/resources/application.properties and configure your database credentials:
+
+server.port=8080
+
+# PostgreSQL Connection Properties Setup
+spring.datasource.url=jdbc:postgresql://localhost:5432/main_analytics
+spring.datasource.username=postgres
+spring.datasource.password=YOUR_DATABASE_PASSWORD
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# JPA & Hibernate Configurations
+spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+
+# Scheduler Thread pool control properties
+spring.task.scheduling.pool.size=5
+
+
+3. Run Backend (Spring Boot)
+
+From your terminal, compile and run the Spring Boot executable:
+
+mvn clean install
+mvn spring-boot:run
+
+
+The REST API server will begin running on http://localhost:8080.
+
+4. Setup Frontend (Vue.js)
+
+Open the frontend prototype folder. You can serve the Vue files through Nginx or simply run them in an active web browser.
+Ensure the base API path in the Vue setup points to your running Spring Boot server:
+http://localhost:8080/api/domains
+
+🔌 REST API Specifications
+
+The Spring Boot backend exposes the following REST endpoints:
+
+Method
+
+Endpoint
+
+Description
+
+Payload Sample
+
+GET
+
+/api/domains
+
+Fetch all monitored sites in Postgres
+
+None
+
+POST
+
+/api/domains
+
+Register a new domain status monitor
+
+{"name":"Stripe API", "url":"https://api.stripe.com", "interval":10, "method":"GET"}
+
+POST
+
+/api/domains/{id}/check
+
+Instantly trigger manual health ping
+
+None
+
+DELETE
+
+/api/domains/{id}
+
+Terminate and delete domain monitor
+
+None
+
+🤝 Contribution
+
+Contributions, bug reports, and pull requests are welcome! Feel free to fork the repository and submit a PR.
+
+📄 License
+
+This project is open-source under the MIT License.
